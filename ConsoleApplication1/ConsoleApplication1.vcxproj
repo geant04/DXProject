@@ -130,13 +130,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="MinimalDXApp.cpp" />
+    <ClCompile Include="Pipeline.cpp" />
     <ClCompile Include="Task.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="Common.h" />
+    <ClInclude Include="Mesh.h" />
     <ClInclude Include="MinimalDXApp.h" />
+    <ClInclude Include="Pipeline.h" />
     <ClInclude Include="Task.h" />
     <ClInclude Include="WinInclude.h" />
   </ItemGroup>

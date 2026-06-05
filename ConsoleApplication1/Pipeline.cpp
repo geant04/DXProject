@@ -6,8 +6,8 @@ void createPSO(
 	ComPtr<ID3D12Device> &mDevice, 
 	ComPtr<ID3D12RootSignature> &mRootSignature, 
 	ComPtr<ID3D12PipelineState> &outPSO,
-	const LPCWSTR* vsAssetName,
-	const LPCWSTR* psAssetName
+	const wchar_t* vsAssetName,
+	const wchar_t* psAssetName
 )
 {
 	ComPtr<ID3DBlob> vertexShader;
@@ -18,8 +18,8 @@ void createPSO(
 	// This way, if we use graphics debugging tools, we get fun symbols and stuff.
 	int32_t compileFlags = 0;
 
-	auto vsPath = GetAssetFullPath(*vsAssetName);
-	auto psPath = GetAssetFullPath(*psAssetName);
+	auto vsPath = GetAssetFullPath(vsAssetName);
+	auto psPath = GetAssetFullPath(psAssetName);
 
 	D3DCompileFromFile(vsPath.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr);
 	D3DCompileFromFile(psPath.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr);
@@ -122,7 +122,7 @@ void createRootSignature(
 	// Converts root signature to a binary blob that the GPU can read
 	// Not sure what a versioned root signature is though
 	D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
-	mDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&mRootSignature));
+	mDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&outRootSignature));
 }
 
 }

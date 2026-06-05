@@ -11,13 +11,6 @@ struct WindowProperties
 	float aspectRatio;
 };
 
-struct Vertex
-{
-    XMFLOAT3 position;
-    XMFLOAT4 color;
-	XMFLOAT2 uv;
-};
-
 class MinimalDXApp
 {
 	// Baseline boiler plate information storing everything needed for a simple DX12 app.
@@ -37,7 +30,7 @@ public:
 
 	void render();
 	void run();
-	void addTask(Task& task);
+	void addTask(std::unique_ptr<Task> task);
 
 	// Something sus, but we roll with it for now.
 	// Do something more advanced later, like multiple buffering?
@@ -68,7 +61,7 @@ private:
 	UINT64 mFenceValue = 0;
 
 	// Miscellanious things
-	std::vector<Task> mTasks;
+	std::vector<std::unique_ptr<Task>> mTasks;
 
 	uint32_t mFrameIndex;
 	uint32_t mRTVDescriptorSize;

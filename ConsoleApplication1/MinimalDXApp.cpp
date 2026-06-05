@@ -1,13 +1,9 @@
 #include "MinimalDXApp.h"
+#include "Pipeline.h"
+#include "Mesh.h"
 #include <iostream>
 
 #define SIMPLE_TEST false
-
-inline std::wstring GetAssetFullPath(LPCWSTR assetName)
-{
-	// Ugly hardcoding for now, but we work with it...
-    return L"..\\shaders\\" + std::wstring(assetName);
-}
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -169,7 +165,7 @@ void MinimalDXApp::initializeDX()
 		mFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		if (mFenceEvent == nullptr)
 		{
-			// ? I don't know
+			// TODO: Need some error handling/validation
 		}
 	}
 }
@@ -178,246 +174,64 @@ void MinimalDXApp::initializeDX()
 // Responsible for PSO creation and compiling vert/pixel shaders
 void MinimalDXApp::loadAssets()
 {
-	
-	// Begin with the root signature. Root signatures address what resources the shader can see on the GPU
-	// I think, like, sadly this gets so much more freakingly complicated when we try to do stuff like 
-	// binding textures and what not. Eh, that's fine - we'll just get there when we get there, you know
-	// You'd link one root signature per pipeline essentially, this root signature defines what's linked to the shader
-	{
-		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	std::unique_ptr<DrawTask> drawHelloTriangle = std::make_unique<DrawTask>();
 
-		if (FAILED(mDevice->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
-		{
-			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-		}
+	Pipeline::createRootSignature(
+		mDevice,
+		drawHelloTriangle->mRootSignature
+	);
 
-		// One SRV, if we have more then scale accordingly
-		// Static flag means descriptor won't change dynamically, determined at compile time
-		CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
-		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+	Pipeline::createPSO(
+		mDevice,
+		drawHelloTriangle->mRootSignature,
+		drawHelloTriangle->mPipelineState,
+		L"vsTriangle.hlsl",
+		L"psTriangle.hlsl"
+	);
 
-		// Only pixel? I wonder if this can be used for vert as well.
-		CD3DX12_ROOT_PARAMETER1 rootParameters[1];
-		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
-
-		// I should probably make some generic sampler builder class in the future, ya know?
-		D3D12_STATIC_SAMPLER_DESC sampler = {};
-		sampler.Filter = D3D12_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT;
-		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.MipLODBias = 0;
-		sampler.MaxAnisotropy = 0;
-		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-		sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-		sampler.MinLOD = 0;
-		sampler.MaxLOD = D3D12_FLOAT32_MAX;
-		sampler.ShaderRegister = 0;
-		sampler.RegisterSpace = 0;
-		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init_1_1(
-			_countof(rootParameters), 
-			rootParameters, 
-			1, 
-			&sampler, 
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
-		);
-		
-		ComPtr<ID3DBlob> signature;
-		ComPtr<ID3DBlob> error;
-		// Converts root signature to a binary blob that the GPU can read
-		// Not sure what a versioned root signature is though
-		D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
-		mDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&mRootSignature));
-	}
-
-	{
-		ComPtr<ID3DBlob> vertexShader;
-		ComPtr<ID3DBlob> pixelShader;
-
-		// For debugging, you might wantt o have the following flags:
-		// D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION
-		// This way, if we use graphics debugging tools, we get fun symbols and stuff.
-		int32_t compileFlags = 0;
-
-		auto vsPath = GetAssetFullPath(L"vsTriangle.hlsl");
-		auto psPath = GetAssetFullPath(L"psTriangle.hlsl");
-
-		D3DCompileFromFile(vsPath.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr);
-		D3DCompileFromFile(psPath.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr);
-
-		D3D12_SHADER_BYTECODE vsByteCode = {};
-		vsByteCode.pShaderBytecode = vertexShader->GetBufferPointer();
-		vsByteCode.BytecodeLength = vertexShader->GetBufferSize();
-
-		D3D12_SHADER_BYTECODE psByteCode = {};
-		psByteCode.pShaderBytecode = pixelShader->GetBufferPointer();
-		psByteCode.BytecodeLength = pixelShader->GetBufferSize();
-
-		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = 
-		{
-			{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12 + 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
-		};
-
-		// PSO building time!
-		// The root signature gets WAYYY more complicated when we start adding more shit to it.
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-		psoDesc.pRootSignature = mRootSignature.Get();
-		psoDesc.VS = vsByteCode;
-		psoDesc.PS = psByteCode;
-		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		psoDesc.DepthStencilState.DepthEnable = FALSE;
-		psoDesc.DepthStencilState.StencilEnable = FALSE;
-		psoDesc.SampleMask = UINT_MAX;
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.SampleDesc.Count = 1;
-
-		mDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPipelineState));
-	}
-
-	// Oh my god finally the pipeline is done... that was actually horrendous
 	// We need to make the command list that'll execute based off of the PSO we made
-	mDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, mCommandAllocator.Get(), mPipelineState.Get(), IID_PPV_ARGS(&mCommandList));
+	mDevice->CreateCommandList(
+		0, 
+		D3D12_COMMAND_LIST_TYPE_DIRECT, 
+		mCommandAllocator.Get(), 
+		drawHelloTriangle->mPipelineState.Get(), 
+		IID_PPV_ARGS(&mCommandList)
+	);
 	
 	// Immediately close it since we're not recording anything
 	mCommandList->Close();
 
-	// Create the veretex buffer!!! Yay
+	// Create helloTriangle mesh information
 	{
 		float aspectRatio = mWindowProperties.aspectRatio;
 
-		Vertex triangleVertices[] =
+		std::vector<Vertex> triangleVertices =
         {
 			{ { 0.0f, 0.25f * aspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f }, { 0.5f, 0.0f } },
 			{ { 0.25f, -0.25f * aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
 			{ { -0.25f, -0.25f * aspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }
         };
 
-		const uint32_t vertexBufferSize = sizeof(triangleVertices);
+		const uint32_t vertexBufferSize = static_cast<uint32_t>(triangleVertices.size() * sizeof(Vertex));
 
-#if SIMPLE_TEST
-		{
-			// Heap properties
-			D3D12_HEAP_PROPERTIES heapProps = {};
-			heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-			heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-			heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-			heapProps.CreationNodeMask = 1;
-			heapProps.VisibleNodeMask = 1;
+		Mesh helloTriangleMesh = Mesh(triangleVertices, vertexBufferSize);
 
-			// Resource description
-			D3D12_RESOURCE_DESC resourceDesc = {};
-			resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-			resourceDesc.Alignment = 0;
-			resourceDesc.Width = vertexBufferSize;
-			resourceDesc.Height = 1;
-			resourceDesc.DepthOrArraySize = 1;
-			resourceDesc.MipLevels = 1;
-			resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-			resourceDesc.SampleDesc.Count = 1;
-			resourceDesc.SampleDesc.Quality = 0;
-			resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-			resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-			// Oh this is probably not recommended, we're directly uploading vertex information?
-			mDevice->CreateCommittedResource(
-				&heapProps,
-				D3D12_HEAP_FLAG_NONE,
-				&resourceDesc,
-				D3D12_RESOURCE_STATE_GENERIC_READ,
-				nullptr,
-				IID_PPV_ARGS(&mVertexBuffer)
-			);
-		}
-
-		UINT8* pVertexDataBegin;
-		D3D12_RANGE readRange = {0, 0};
-		mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin));
-		memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
-		mVertexBuffer->Unmap(0, nullptr);
-
-		mVertexBufferView.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
-		mVertexBufferView.StrideInBytes = sizeof(Vertex);
-		mVertexBufferView.SizeInBytes = vertexBufferSize;
-#else
-		// Before, the above code commited reosurce in upload heap, "marshalled over" means GPU will access CPU data via PCIe bus
-		// Too expensive, so the documentation recommended I read up on default heap usage instead, which I'll do!
-		CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT);
-		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
-
-		// Vertex buffer will reside on the GPU as a default heap
-		mDevice->CreateCommittedResource(
-			&defaultHeapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(&mVertexBuffer)
+		// Vertex buffer data upload call
+		helloTriangleMesh.UploadMeshBuffer(
+			mDevice,
+			drawHelloTriangle->mVertexBuffer,
+			drawHelloTriangle->mVertexBufferUpload,
+			drawHelloTriangle->mVertexBufferView,
+			mCommandAllocator,
+			mCommandList,
+			mCommandQueue,
+			drawHelloTriangle->mPipelineState
 		);
 		
-		// Upload heap on CPU, sends data to vertex buffer on GPU
-		// The purpose for this is to prepare our buffer data on system RAM to be uploaded to the GPU later
-		CD3DX12_HEAP_PROPERTIES uploadHeapProps(D3D12_HEAP_TYPE_UPLOAD);
-		
-		mDevice->CreateCommittedResource(
-			&uploadHeapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&mVertexBufferUpload)
-		);
-
-		// Copy memory to upload heap
-		// We're strictly writing, so no need to define a read range.
-		UINT8* pVertexDataBegin;
-		D3D12_RANGE readRange = {0, 0};
-		mVertexBufferUpload->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin));
-		memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
-		mVertexBufferUpload->Unmap(0, nullptr);
-
-		mVertexBufferView.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
-		mVertexBufferView.StrideInBytes = sizeof(Vertex);
-		mVertexBufferView.SizeInBytes = vertexBufferSize;
-
-		// Execute the buffer upload
-		mCommandAllocator->Reset();
-		mCommandList->Reset(mCommandAllocator.Get(), mPipelineState.Get());
-
-		mCommandList->CopyBufferRegion(
-			mVertexBuffer.Get(), 0,
-			mVertexBufferUpload.Get(), 0,
-			vertexBufferSize
-		);
-		
-		// We were originally D3D12_RESOURCE_STATE_COPY_DEST,
-		// need to transition this to a vertex buffer so the shader can interpret the resource properly I assume
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			mVertexBuffer.Get(),
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
-		);
-
-		mCommandList->ResourceBarrier(1, &barrier);
-
-		mCommandList->Close();
-		ID3D12CommandList* ppCommandList[] = { mCommandList.Get() };
-		mCommandQueue->ExecuteCommandLists(_countof(ppCommandList), ppCommandList);
-
 		waitForPreviousFrame();
 
 		// Reset this until we need to do another vertex buffer upload, not needed anymore since we copied relevant info over
-		mVertexBufferUpload.Reset();
-#endif
+		drawHelloTriangle->mVertexBufferUpload.Reset();
 	}
 
 	// Texture creation stage
@@ -438,8 +252,6 @@ void MinimalDXApp::loadAssets()
 	// Exciting! I think if this works, then I can set up the CBV and get a triangle spinning in no time.
 	// Another goal past this point is maybe figuring out how to use a UAV to write to a texture next, and do some exciting post-processing.
 	{
-
-
 		D3D12_RESOURCE_DESC textureDesc = {};
 		textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		textureDesc.MipLevels = 1;
@@ -514,7 +326,7 @@ void MinimalDXApp::loadAssets()
 
 		// Execute texture upload command
 		mCommandAllocator->Reset();
-		mCommandList->Reset(mCommandAllocator.Get(), mPipelineState.Get());
+		mCommandList->Reset(mCommandAllocator.Get(), drawHelloTriangle->mPipelineState.Get());
 		
 		UpdateSubresources(mCommandList.Get(), mTexture.Get(), mTextureUploadHeap.Get(), 0, 0, 1, &textureData);
 		CD3DX12_RESOURCE_BARRIER mTexCopyToPSBarrier = CD3DX12_RESOURCE_BARRIER::Transition(mTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -533,18 +345,19 @@ void MinimalDXApp::loadAssets()
 		mCommandList->Close();
 		ID3D12CommandList* ppCommandLists[] = { mCommandList.Get() };
 		mCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
 	}
 
 	// Sync
 	{
 		waitForPreviousFrame();
 	}
+
+	mTasks.push_back(std::move(drawHelloTriangle));
 }
 
-void MinimalDXApp::addTask(Task& task)
+void MinimalDXApp::addTask(std::unique_ptr<Task> task)
 {
-	mTasks.push_back(task);
+	mTasks.push_back(std::move(task));
 }
 
 void MinimalDXApp::render()
@@ -563,10 +376,6 @@ void MinimalDXApp::render()
 	mCommandList->RSSetViewports(1, &viewport);
     mCommandList->RSSetScissorRects(1, &scissorRect);
 
-    // Clear the render target
-    FLOAT clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-    mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-
 	// Transition the back buffer to render target
     D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 		mRenderTargets[mFrameIndex].Get(),
@@ -575,9 +384,13 @@ void MinimalDXApp::render()
 	);
     mCommandList->ResourceBarrier(1, &barrier);
 
+    // Clear the render target
+    FLOAT clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+    mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
 	for (auto& task : mTasks)
 	{	
-		task.execute(mCommandList, mCommandAllocator, mRenderTargets[mFrameIndex], rtvHandle);
+		task->execute(mCommandList, mCommandAllocator, mRenderTargets[mFrameIndex], rtvHandle);
 	}
 	
     // Transition back buffer to present
