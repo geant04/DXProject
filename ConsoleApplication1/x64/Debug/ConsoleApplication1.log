@@ -1,0 +1,91 @@
+﻿  main.cpp
+  MinimalDXApp.cpp
+  Task.cpp
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(235,94): error C2065: 'mRootSignature': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(235,10): error C2660: 'ID3D12Device::CreateRootSignature': function does not take 3 arguments
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\d3d12.h(9047,43):
+      see declaration of 'ID3D12Device::CreateRootSignature'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(235,10):
+      while trying to match the argument list '(int, LPVOID, SIZE_T)'
+  
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(272,28): error C2065: 'mRootSignature': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(285,50): error C2065: 'mPipelineState': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(285,10): error C2660: 'ID3D12Device::CreateGraphicsPipelineState': function does not take 1 arguments
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\d3d12.h(9016,43):
+      see declaration of 'ID3D12Device::CreateGraphicsPipelineState'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(285,10):
+      while trying to match the argument list '(D3D12_GRAPHICS_PIPELINE_STATE_DESC *)'
+  
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(290,89): error C2065: 'mPipelineState': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(290,9): error C2660: 'ID3D12Device::CreateCommandList': function does not take 5 arguments
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\d3d12.h(9026,43):
+      see declaration of 'ID3D12Device::CreateCommandList'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(290,9):
+      while trying to match the argument list '(int, D3D12_COMMAND_LIST_TYPE, T *, const _GUID, void **)'
+          with
+          [
+              T=ID3D12CommandAllocator
+          ]
+  
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(365,4): error C2065: 'mVertexBuffer': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(359,10): error C2660: 'ID3D12Device::CreateCommittedResource': function does not take 5 arguments
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\d3d12.h(9122,43):
+      see declaration of 'ID3D12Device::CreateCommittedResource'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(359,10):
+      while trying to match the argument list '(CD3DX12_HEAP_PROPERTIES *, D3D12_HEAP_FLAGS, CD3DX12_RESOURCE_DESC *, D3D12_RESOURCE_STATES, nullptr)'
+  
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(378,4): error C2065: 'mVertexBufferUpload': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(372,10): error C2660: 'ID3D12Device::CreateCommittedResource': function does not take 5 arguments
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\d3d12.h(9122,43):
+      see declaration of 'ID3D12Device::CreateCommittedResource'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(372,10):
+      while trying to match the argument list '(CD3DX12_HEAP_PROPERTIES *, D3D12_HEAP_FLAGS, CD3DX12_RESOURCE_DESC *, D3D12_RESOURCE_STATES, nullptr)'
+  
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(385,3): error C2065: 'mVertexBufferUpload': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(387,3): error C2065: 'mVertexBufferUpload': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(389,3): error C2065: 'mVertexBufferView': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(389,38): error C2065: 'mVertexBuffer': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(390,3): error C2065: 'mVertexBufferView': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(391,3): error C2065: 'mVertexBufferView': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(395,48): error C2065: 'mPipelineState': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(395,15): error C2660: 'ID3D12GraphicsCommandList::Reset': function does not take 1 arguments
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\d3d12.h(6342,43):
+      see declaration of 'ID3D12GraphicsCommandList::Reset'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(395,15):
+      while trying to match the argument list '(T *)'
+          with
+          [
+              T=ID3D12CommandAllocator
+          ]
+  
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(398,4): error C2065: 'mVertexBuffer': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(399,4): error C2065: 'mVertexBufferUpload': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(397,15): error C2660: 'ID3D12GraphicsCommandList::CopyBufferRegion': function does not take 4 arguments
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\d3d12.h(6367,40):
+      see declaration of 'ID3D12GraphicsCommandList::CopyBufferRegion'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(397,15):
+      while trying to match the argument list '()'
+  
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(406,4): error C2065: 'mVertexBuffer': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(411,37): error C3536: 'barrier': cannot be used before it is initialized
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(411,15): error C2664: 'void ID3D12GraphicsCommandList::ResourceBarrier(UINT,const D3D12_RESOURCE_BARRIER *)': cannot convert argument 2 from 'int *' to 'const D3D12_RESOURCE_BARRIER *'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(411,36):
+      Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or parenthesized function-style cast
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\d3d12.h(6421,40):
+      see declaration of 'ID3D12GraphicsCommandList::ResourceBarrier'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(411,15):
+      while trying to match the argument list '(int, int *)'
+  
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(420,3): error C2065: 'mVertexBufferUpload': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(518,48): error C2065: 'mPipelineState': undeclared identifier
+C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(518,15): error C2660: 'ID3D12GraphicsCommandList::Reset': function does not take 1 arguments
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\d3d12.h(6342,43):
+      see declaration of 'ID3D12GraphicsCommandList::Reset'
+      C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\ConsoleApplication1\MinimalDXApp.cpp(518,15):
+      while trying to match the argument list '(T *)'
+          with
+          [
+              T=ID3D12CommandAllocator
+          ]
+  
+  Generating Code...
