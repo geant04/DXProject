@@ -1,2 +1,5 @@
 ﻿  MinimalDXApp.cpp
+  Pipeline.cpp
+  RootSignature.cpp
+  Generating Code...
   ConsoleApplication1.vcxproj -> C:\Users\ge010\OneDrive\Documents\VSprojects\DirectProject\x64\Debug\ConsoleApplication1.exe

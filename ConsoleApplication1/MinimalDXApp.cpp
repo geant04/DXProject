@@ -1,5 +1,6 @@
 #include "MinimalDXApp.h"
 #include "Pipeline.h"
+#include "RootSignature.h"
 #include "Mesh.h"
 #include <iostream>
 
@@ -176,7 +177,7 @@ void MinimalDXApp::loadAssets()
 {
 	std::unique_ptr<DrawTask> drawHelloTriangle = std::make_unique<DrawTask>();
 
-	Pipeline::createRootSignature(
+	RootSignature::createRootSignature(
 		mDevice,
 		drawHelloTriangle->mRootSignature
 	);
@@ -234,6 +235,21 @@ void MinimalDXApp::loadAssets()
 		drawHelloTriangle->mVertexBufferUpload.Reset();
 	}
 
+	{
+		// TODO:
+		// My goal is to do some fun compute shader dispatch work that modifies our "screen", having a thread modify a UAV.
+		// This is our ad-hoc path-tracer, which simulates path-tracing on a per-thread level.
+		// We will then do some copy-to-RTV operation, such that we draw to the swap-chain using the results
+		// from our compute pass.
+		// Overall, this requires:
+		// 1. Path-tracing target UAV
+		// 2. Transition from UAV to SRV after the compute work is done (requires a barrier)
+		// 3. Root signature using our SRV, and final draw to RT using our transitioned SRV.
+
+
+	}
+
+#if 0
 	// Texture creation stage
 	// By this point, we've properly setup our awesome umm everythings!
 	// This includes a descriptor heap for the SRVs, and a modified root signature
@@ -346,6 +362,7 @@ void MinimalDXApp::loadAssets()
 		ID3D12CommandList* ppCommandLists[] = { mCommandList.Get() };
 		mCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 	}
+#endif
 
 	// Sync
 	{
