@@ -12,14 +12,12 @@ void createPSO(
 	const wchar_t* psAssetName
 );
 
-void createRootSignature(
-	ComPtr<ID3D12Device> &mDevice,
-	ComPtr<ID3D12RootSignature> &outRootSignature
-);
-
-void createPathTracingRootSignature(
-	ComPtr<ID3D12Device> &mDevice,
-	ComPtr<ID3D12RootSignature> &outRootSignature
+void createComputePSO(
+	ComPtr<ID3D12Device> &mDevice, 
+	ComPtr<ID3D12RootSignature> &mRootSignature, 
+	ComPtr<ID3D12PipelineState> &outPSO,
+	const wchar_t* csAssetName,
+	const char* entryPoint
 );
 
 }

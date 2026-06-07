@@ -79,20 +79,79 @@ void createPathTracingRootSignature(
 
 	// Define two descriptor ranges for our RWTexture2D path-traced output (UAV), and one for our input (SRV).
 	// SRV will store data such as camera info and scene geo.
-	CD3DX12_DESCRIPTOR_RANGE1 UAVDescriptorRange = {};
-	UAVDescriptorRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0);
+	CD3DX12_DESCRIPTOR_RANGE1 descriptorRanges[2];
+	descriptorRanges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0); // u0
+	// descriptorRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0); // b0 (?)
+	descriptorRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0); // t0
 
-	CD3DX12_DESCRIPTOR_RANGE1 SRVDescriptorRange = {};
-	SRVDescriptorRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
-
-	std::vector<CD3DX12_DESCRIPTOR_RANGE1> descriptorRanges = {UAVDescriptorRange, SRVDescriptorRange};
-
-	CD3DX12_ROOT_PARAMETER1 rootParameter;
-	rootParameter.InitAsDescriptorTable(2, descriptorRanges.data());
+	CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+	rootParameters[0].InitAsDescriptorTable(1, &descriptorRanges[0]);
+	rootParameters[1].InitAsConstantBufferView(0);
+	rootParameters[2].InitAsDescriptorTable(1, &descriptorRanges[1]);
 
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-	rootSignatureDesc.Init_1_1(1, &rootParameter);
+	rootSignatureDesc.Init_1_1(_countof(rootParameters), &rootParameters[0]);
 	
+	ComPtr<ID3DBlob> signature;
+	ComPtr<ID3DBlob> error;
+	HRESULT hr = D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
+
+	if (FAILED(hr)) {
+		return std::perror("[ERROR CS]: Cannot serialize versioned root signature");
+	}
+
+	hr = mDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&outRootSignature));
+	if (FAILED(hr)) {
+		return std::perror("[ERROR CS]: Cannot create PT root signature");
+	}
+}
+
+// Blit results from UAV to the screen
+void createBlitRootSignature(
+	ComPtr<ID3D12Device> &mDevice,
+	ComPtr<ID3D12RootSignature> &outRootSignature
+)
+{
+	// Ugly repeated code, but attempting to get this code out in the one week of time I have.
+	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+
+	if (FAILED(mDevice->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+	{
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+	}
+
+	// SRV storing the path-traced output
+	CD3DX12_DESCRIPTOR_RANGE1 descriptorRanges[1];
+	descriptorRanges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0); // t0
+
+	// SRV Sampler
+	D3D12_STATIC_SAMPLER_DESC sampler = {};
+	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.MipLODBias = 0;
+	sampler.MaxAnisotropy = 0;
+	sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	sampler.MinLOD = 0;
+	sampler.MaxLOD = D3D12_FLOAT32_MAX;
+	sampler.ShaderRegister = 0;
+	sampler.RegisterSpace = 0;
+	sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	CD3DX12_ROOT_PARAMETER1 rootParameters[1];
+	rootParameters[0].InitAsDescriptorTable(1, &descriptorRanges[0]);
+
+	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+	rootSignatureDesc.Init_1_1(
+		_countof(rootParameters),
+		&rootParameters[0],
+		1,
+		&sampler,
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+	);
+
 	ComPtr<ID3DBlob> signature;
 	ComPtr<ID3DBlob> error;
 	HRESULT hr = D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);

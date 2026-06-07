@@ -16,11 +16,12 @@ struct PSOuput
     float2 texCoord : TEXCOORD;
 };
 
-PSOuput VSMain(float4 position : POSITION, float4 color : COLOR)
+PSOuput VSMain(float4 position : POSITION, float4 color : COLOR, float2 texCoord : TEXCOORD)
 {
     PSOuput result;
 
     result.position = position;
+    result.texCoord = texCoord;
     result.color = color;
 
     return result;

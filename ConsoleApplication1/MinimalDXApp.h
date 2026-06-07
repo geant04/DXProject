@@ -50,11 +50,9 @@ private:
 
 	// Resources
 	ComPtr<ID3D12DescriptorHeap> mRTVDescriptorHeap;
-	ComPtr<ID3D12DescriptorHeap> mSRVHeap;
-	ComPtr<ID3D12DescriptorHeap> mTextureHeap;
-	ComPtr<ID3D12Resource> mTextureUploadHeap;
+	ComPtr<ID3D12DescriptorHeap> mShaderResourceHeap;
 	ComPtr<ID3D12Resource> mRenderTargets[mFrameCount];
-	ComPtr<ID3D12Resource> mTexture;
+	ComPtr<ID3D12Resource> mScreenTexture;
 
 	ComPtr<ID3D12Fence> mFence;
 	HANDLE mFenceEvent;
@@ -65,5 +63,6 @@ private:
 
 	uint32_t mFrameIndex;
 	uint32_t mRTVDescriptorSize;
+	uint32_t mShaderResourceDescriptorSize;
 };
 

@@ -66,4 +66,47 @@ void createPSO(
 	}
 }
 
+void createComputePSO(
+	ComPtr<ID3D12Device> &mDevice, 
+	ComPtr<ID3D12RootSignature> &mRootSignature, 
+	ComPtr<ID3D12PipelineState> &outPSO,
+	const wchar_t* csAssetName,
+	const char* entryPoint
+)
+{
+	ComPtr<ID3DBlob> csShader;
+
+	// For debugging, you might wantt o have the following flags:
+	// D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION
+	// This way, if we use graphics debugging tools, we get fun symbols and stuff.
+	int32_t compileFlags = 0;
+
+	auto csPath = GetAssetFullPath(csAssetName);
+
+	ComPtr<ID3DBlob> errorMsg;
+	HRESULT hr = D3DCompileFromFile(csPath.c_str(), nullptr, nullptr, entryPoint, "cs_5_0", compileFlags, 0, &csShader, &errorMsg);
+
+	if (FAILED(hr)) {
+		if (errorMsg) {
+			OutputDebugStringA((char*)errorMsg->GetBufferPointer());
+		}
+		return;
+	}
+
+	D3D12_SHADER_BYTECODE csByteCode = {};
+	csByteCode.pShaderBytecode = csShader->GetBufferPointer();
+	csByteCode.BytecodeLength = csShader->GetBufferSize();
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
+	psoDesc.pRootSignature = mRootSignature.Get();
+	psoDesc.CS = csByteCode;
+
+	mDevice->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&outPSO));
+
+	if (outPSO == NULL) {
+		// Problem detected, need to log this!
+		return;
+	}
+}
+
 }

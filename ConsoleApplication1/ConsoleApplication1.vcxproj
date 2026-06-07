@@ -153,6 +153,12 @@
     <None Include="..\shaders\vsTriangle.hlsl">
       <FileType>Document</FileType>
     </None>
+    <None Include="..\shaders\csPathTracer.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="..\shaders\psBlit.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

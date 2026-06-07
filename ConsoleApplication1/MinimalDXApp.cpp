@@ -54,10 +54,27 @@ I think there should be a destructor of some sort implemented later on, but we'l
 */
 void MinimalDXApp::initializeDX()
 {
-	// Begin with the DXGI Factory. 
+	UINT factoryFlags = 0;
+
+#if defined(_DEBUG)
+	// Turn on the D3D12 debug layer so resource-state, descriptor, and PSO mismatches
+	// show up as messages in the Output window instead of silently producing garbage/white frames.
+	{
+		ComPtr<ID3D12Debug1> debugController;
+		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+		{
+			debugController->EnableDebugLayer();
+			debugController->SetEnableGPUBasedValidation(TRUE);
+		}
+
+		factoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+	}
+#endif
+
+	// Begin with the DXGI Factory.
 	// DXGI is the bridge between GPU/driver and the code
 	// Not sure what IID_PPV_ARGS does, but returns interface pointer... whatever that means
-	CreateDXGIFactory2(0, IID_PPV_ARGS(&mFactory));
+	CreateDXGIFactory2(factoryFlags, IID_PPV_ARGS(&mFactory));
 
 	// I do need to check that this isn't my integrated graphics, I might have multiple adapters
 	mFactory->EnumAdapters1(0, &mAdapter);
@@ -129,7 +146,7 @@ void MinimalDXApp::initializeDX()
 
 		// So yes, I was correct that this part gets complicated when we add SRV heaps. My question, though, is that if we 
 		// want to bind multiple textures, does it just require one heap, or many?
-		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+		D3D12_DESCRIPTOR_HEAP_DESC shaderResourceHeapDesc = {};
 
 		// In theory, if I wanted multiple textures, then I'd adjust the number of descriptors.
 		// This is overly simplistic, though! It does not scale at all.
@@ -138,10 +155,16 @@ void MinimalDXApp::initializeDX()
 
 		// Descriptor is a metadata record. Stored in the descriptor heap
 		// This should be called the textureHeap or something in the future, should I add more textures to it
-		srvHeapDesc.NumDescriptors = 1;
-		srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		mDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSRVHeap));
+		// Updating SRVHeapDesc to contain 3 now for our simple PathTracing app.
+		// Slot 0: UAV, mScreenTexture
+		// Slot 1: SRV, for the scene geo and camera info
+		// Slot 2: SRV, view for the mScreenTexture
+		shaderResourceHeapDesc.NumDescriptors = 3;
+		shaderResourceHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		shaderResourceHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		mDevice->CreateDescriptorHeap(&shaderResourceHeapDesc, IID_PPV_ARGS(&mShaderResourceHeap));
+		mShaderResourceDescriptorSize = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 	}
 
 	// Create frame resources in the swap chain, can we think of this as populating frame data per backbuffer in the swapchain?
@@ -175,19 +198,19 @@ void MinimalDXApp::initializeDX()
 // Responsible for PSO creation and compiling vert/pixel shaders
 void MinimalDXApp::loadAssets()
 {
-	std::unique_ptr<DrawTask> drawHelloTriangle = std::make_unique<DrawTask>();
+	std::unique_ptr<DrawTask> drawScreen = std::make_unique<DrawTask>();
 
-	RootSignature::createRootSignature(
+	RootSignature::createBlitRootSignature(
 		mDevice,
-		drawHelloTriangle->mRootSignature
+		drawScreen->mRootSignature
 	);
 
 	Pipeline::createPSO(
 		mDevice,
-		drawHelloTriangle->mRootSignature,
-		drawHelloTriangle->mPipelineState,
+		drawScreen->mRootSignature,
+		drawScreen->mPipelineState,
 		L"vsTriangle.hlsl",
-		L"psTriangle.hlsl"
+		L"psBlit.hlsl"
 	);
 
 	// We need to make the command list that'll execute based off of the PSO we made
@@ -195,22 +218,22 @@ void MinimalDXApp::loadAssets()
 		0, 
 		D3D12_COMMAND_LIST_TYPE_DIRECT, 
 		mCommandAllocator.Get(), 
-		drawHelloTriangle->mPipelineState.Get(), 
+		drawScreen->mPipelineState.Get(), 
 		IID_PPV_ARGS(&mCommandList)
 	);
 	
 	// Immediately close it since we're not recording anything
 	mCommandList->Close();
 
-	// Create helloTriangle mesh information
+	// Create drawScreen mesh information
 	{
 		float aspectRatio = mWindowProperties.aspectRatio;
 
 		std::vector<Vertex> triangleVertices =
         {
-			{ { 0.0f, 0.25f * aspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f }, { 0.5f, 0.0f } },
-			{ { 0.25f, -0.25f * aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
-			{ { -0.25f, -0.25f * aspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }
+			{ { -1.0f, -1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f } },
+			{ { -1.0f, 3.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f }, { 0.0f, -1.0f } },
+			{ { 3.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f }, { 2.0f, 1.0f } }
         };
 
 		const uint32_t vertexBufferSize = static_cast<uint32_t>(triangleVertices.size() * sizeof(Vertex));
@@ -220,19 +243,19 @@ void MinimalDXApp::loadAssets()
 		// Vertex buffer data upload call
 		helloTriangleMesh.UploadMeshBuffer(
 			mDevice,
-			drawHelloTriangle->mVertexBuffer,
-			drawHelloTriangle->mVertexBufferUpload,
-			drawHelloTriangle->mVertexBufferView,
+			drawScreen->mVertexBuffer,
+			drawScreen->mVertexBufferUpload,
+			drawScreen->mVertexBufferView,
 			mCommandAllocator,
 			mCommandList,
 			mCommandQueue,
-			drawHelloTriangle->mPipelineState
+			drawScreen->mPipelineState
 		);
 		
 		waitForPreviousFrame();
 
 		// Reset this until we need to do another vertex buffer upload, not needed anymore since we copied relevant info over
-		drawHelloTriangle->mVertexBufferUpload.Reset();
+		drawScreen->mVertexBufferUpload.Reset();
 	}
 
 	{
@@ -246,130 +269,118 @@ void MinimalDXApp::loadAssets()
 		// 2. Transition from UAV to SRV after the compute work is done (requires a barrier)
 		// 3. Root signature using our SRV, and final draw to RT using our transitioned SRV.
 
+		std::unique_ptr<ComputeTask> pathTraceTask = std::make_unique<ComputeTask>();
 
-	}
+		RootSignature::createPathTracingRootSignature(
+			mDevice,
+			pathTraceTask->mRootSignature
+		);
 
-#if 0
-	// Texture creation stage
-	// By this point, we've properly setup our awesome umm everythings!
-	// This includes a descriptor heap for the SRVs, and a modified root signature
-	// that now proudly includes a slot to store our first SRV and 1 static sampler.
-	// The heap only has one descriptor for our SRV. According to GPT, most production renderers have multiple.
-	// Overall memory binding process from my understanding:
-	// 1. Define descriptor heap for your resource, jotting down num of descriptors and what types of descriptors are there
-	// 2. In your root signature param, init our SRV in the first slot of our descriptor heap
-	// 3. Create root signature using our param, this now has our first SRV. I imagine for CBVs, you just init it and it's straight forward
-	// 4. Bind any samplers necessary to the root signature
-	// 5. Ensure that your PSO now uses this root signature so that it can actually do stuff
-	// 6. CommandList goes brrr
-
-	// However, I don't think we ever went over how to actually view the texture data, or I assume link the SRV to actual texture info
-	// on the GPU, which I assume is what this section now covers in high detail.
-	// Exciting! I think if this works, then I can set up the CBV and get a triangle spinning in no time.
-	// Another goal past this point is maybe figuring out how to use a UAV to write to a texture next, and do some exciting post-processing.
-	{
+		Pipeline::createComputePSO(
+			mDevice,
+			pathTraceTask->mRootSignature,
+			pathTraceTask->mPipelineState,
+			L"csPathTracer.hlsl",
+			"CSMain"
+		);
+		
 		D3D12_RESOURCE_DESC textureDesc = {};
 		textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		textureDesc.MipLevels = 1;
-		textureDesc.Width = 256;
-		textureDesc.Height = 256;
-		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+		textureDesc.Width = mWindowProperties.mWidth;
+		textureDesc.Height = mWindowProperties.mHeight;
+		textureDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 		textureDesc.DepthOrArraySize = 1;
 		textureDesc.SampleDesc.Count = 1;
 		textureDesc.SampleDesc.Quality = 0;
 		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
-
+		// Resource state initial at PS_Resource, s.t we go PS -> UA -> PS per frame
 		CD3DX12_HEAP_PROPERTIES defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		mDevice->CreateCommittedResource(
 			&defaultHeapProperties,
 			D3D12_HEAP_FLAG_NONE,
 			&textureDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
 			nullptr,
-			IID_PPV_ARGS(&mTexture)
+			IID_PPV_ARGS(&mScreenTexture)
 		);
 
-		UINT64 uploadBufferSize = GetRequiredIntermediateSize(mTexture.Get(), 0, 1);
-		CD3DX12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+		mScreenTexture->SetName(L"Screen Texture");
 
+		CameraConstants cameraConstants = {};
+		pathTraceTask->mCameraConstants = cameraConstants;
+
+		// Camera constant buffer: upload heap, persistently mapped so we can memcpy fresh data each frame
+		const UINT cameraCBSize = (sizeof(CameraConstants) + 255) & ~255;
+		CD3DX12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		CD3DX12_RESOURCE_DESC cameraCBDesc = CD3DX12_RESOURCE_DESC::Buffer(cameraCBSize);
 		mDevice->CreateCommittedResource(
 			&uploadHeapProperties,
 			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
+			&cameraCBDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(&mTextureUploadHeap)
+			IID_PPV_ARGS(&pathTraceTask->mCameraConstantBuffer)
 		);
 
-		// Populate texture data, define it on host
-		UINT rowPitch = 256 * 4;
-		UINT cellPitch = rowPitch >> 3;
-		UINT cellHeight = 256 >> 3;
-		UINT textureSize = rowPitch * 256;
+		pathTraceTask->mCameraConstantBuffer->SetName(L"Camera Constant Buffer");
 
-		std::vector<UINT8> texture(textureSize);
-		UINT8* pData = &texture[0];
+		D3D12_RANGE cameraCBReadRange = { 0, 0 };
+		pathTraceTask->mCameraConstantBuffer->Map(0, &cameraCBReadRange, reinterpret_cast<void**>(&pathTraceTask->mCameraConstantBufferData));
+		memcpy(pathTraceTask->mCameraConstantBufferData, &pathTraceTask->mCameraConstants, sizeof(CameraConstants));
 
-		for (UINT n = 0; n < textureSize; n += 4)
-		{
-			UINT x = n % rowPitch;
-			UINT y = n / rowPitch;
-			UINT i = x / cellPitch;
-			UINT j = y / cellHeight;
+		// Walk the shader-visible heap, building a view at each reserved slot:
+		// Slot 0: UAV of mScreenTexture (compute output, u0)
+		// Slot 1: reserved for scene-geo / future texture SRV (t0 in the path tracing root signature)
+		// Slot 2: SRV of mScreenTexture (sampled by drawScreen's pixel shader, t0)
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = mShaderResourceHeap->GetCPUDescriptorHandleForHeapStart();
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = mShaderResourceHeap->GetGPUDescriptorHandleForHeapStart();
 
-			if (i % 2 == j % 2)
-			{
-				pData[n] = 0x00;
-				pData[n+1] = 0x00;
-				pData[n+2] = 0x00;
-				pData[n+3] = 0x00;
-			}
-			else
-			{
-				pData[n] = 0xff;
-				pData[n+1] = 0xff;
-				pData[n+2] = 0xff;
-				pData[n+3] = 0xff;
-			}
-		}
+		// Populate slot 0
+		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+		uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		mDevice->CreateUnorderedAccessView(mScreenTexture.Get(), nullptr, &uavDesc, cpuHandle);
+		pathTraceTask->mOutputUAVHandle = gpuHandle;
 
-		D3D12_SUBRESOURCE_DATA textureData = {};
-		textureData.pData = &texture[0];
-		textureData.RowPitch = 256 * 4;
-		textureData.SlicePitch = textureData.RowPitch * 256;
+		cpuHandle.ptr += mShaderResourceDescriptorSize;
+		gpuHandle.ptr += mShaderResourceDescriptorSize;
+		// Slot 1 stays unpopulated until there's actual scene/texture data to view
 
-		// Execute texture upload command
-		mCommandAllocator->Reset();
-		mCommandList->Reset(mCommandAllocator.Get(), drawHelloTriangle->mPipelineState.Get());
-		
-		UpdateSubresources(mCommandList.Get(), mTexture.Get(), mTextureUploadHeap.Get(), 0, 0, 1, &textureData);
-		CD3DX12_RESOURCE_BARRIER mTexCopyToPSBarrier = CD3DX12_RESOURCE_BARRIER::Transition(mTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		cbvDesc.BufferLocation = pathTraceTask->mCameraConstantBuffer->GetGPUVirtualAddress();
+		cbvDesc.SizeInBytes = cameraCBSize;
+		mDevice->CreateConstantBufferView(&cbvDesc, cpuHandle);
 
-		mCommandList->ResourceBarrier(1, &mTexCopyToPSBarrier);
+		cpuHandle.ptr += mShaderResourceDescriptorSize;
+		gpuHandle.ptr += mShaderResourceDescriptorSize;
+		// Populate slot 2
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = textureDesc.Format;
+		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
-		
-		mDevice->CreateShaderResourceView(mTexture.Get(), &srvDesc, mSRVHeap->GetCPUDescriptorHandleForHeapStart());
+		mDevice->CreateShaderResourceView(mScreenTexture.Get(), &srvDesc, cpuHandle);
 
-		// Bombs away!
-		mCommandList->Close();
-		ID3D12CommandList* ppCommandLists[] = { mCommandList.Get() };
-		mCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+		drawScreen->mDescriptorHeap = mShaderResourceHeap;
+		drawScreen->mSRVTableHandle = gpuHandle;
+
+		pathTraceTask->mOutputTexture = mScreenTexture;
+		pathTraceTask->mDescriptorHeap = mShaderResourceHeap;
+		pathTraceTask->mDispatchWidth = (mWindowProperties.mWidth + 7) / 8; // hardcoded (8, 8, 1) dims
+		pathTraceTask->mDispatchHeight = (mWindowProperties.mHeight + 7) / 8;
+
+		mTasks.push_back(std::move(pathTraceTask));
 	}
-#endif
 
 	// Sync
 	{
 		waitForPreviousFrame();
 	}
 
-	mTasks.push_back(std::move(drawHelloTriangle));
+	mTasks.push_back(std::move(drawScreen));
 }
 
 void MinimalDXApp::addTask(std::unique_ptr<Task> task)
@@ -407,7 +418,7 @@ void MinimalDXApp::render()
 
 	for (auto& task : mTasks)
 	{	
-		task->execute(mCommandList, mCommandAllocator, mRenderTargets[mFrameIndex], rtvHandle);
+		task->execute(mCommandList, mCommandAllocator, &rtvHandle);
 	}
 	
     // Transition back buffer to present

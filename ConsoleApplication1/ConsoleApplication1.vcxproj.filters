@@ -70,5 +70,11 @@
     <None Include="..\shaders\vsTriangle.hlsl">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\shaders\csPathTracer.hlsl">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\shaders\psBlit.hlsl">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
