@@ -64,5 +64,6 @@ private:
 	uint32_t mFrameIndex;
 	uint32_t mRTVDescriptorSize;
 	uint32_t mShaderResourceDescriptorSize;
+	uint32_t* frameNumber;
 };
 

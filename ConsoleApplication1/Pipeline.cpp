@@ -84,7 +84,17 @@ void createComputePSO(
 	auto csPath = GetAssetFullPath(csAssetName);
 
 	ComPtr<ID3DBlob> errorMsg;
-	HRESULT hr = D3DCompileFromFile(csPath.c_str(), nullptr, nullptr, entryPoint, "cs_5_0", compileFlags, 0, &csShader, &errorMsg);
+	HRESULT hr = D3DCompileFromFile(
+		csPath.c_str(), 
+		nullptr, 
+		D3D_COMPILE_STANDARD_FILE_INCLUDE, 
+		entryPoint, 
+		"cs_5_0", 
+		compileFlags, 
+		0, 
+		&csShader, 
+		&errorMsg
+	);
 
 	if (FAILED(hr)) {
 		if (errorMsg) {

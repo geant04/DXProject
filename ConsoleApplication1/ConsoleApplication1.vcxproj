@@ -147,6 +147,8 @@
     <ClInclude Include="WinInclude.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\shaders\Common.hlsli" />
+    <None Include="..\shaders\Intersections.hlsl" />
     <None Include="..\shaders\psTriangle.hlsl">
       <FileType>Document</FileType>
     </None>

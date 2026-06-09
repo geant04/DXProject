@@ -1,0 +1,147 @@
+#ifndef __COMMON_HLSLI__
+#define __COMMON_HLSLI__
+
+// Header file used for various things, such as defining structs, and random functions.
+// Will need a dedicated shader file for uniform rng() ray generation code when we path-trace eventually.
+
+struct Material
+{
+	float3 color;
+	float metallic;
+	float transmissive;
+	bool isEmissive;
+};
+
+struct Sphere
+{
+	float3 center;
+	float radius;
+	Material material;
+};
+
+struct Plane
+{
+	float3 center;
+	float3 normal;
+	float2 scaleXY;
+	Material material;
+};
+
+struct Ray
+{
+	float3 origin;
+	float3 direction;
+};
+
+// Intersection Code
+struct Intersect
+{
+	float3 position;
+	float3 normal;
+	Material material;
+	float t;
+	bool isHit;
+};
+
+void GetSphereIntersection(in Sphere sphere, in Ray ray, inout Intersect intersect)
+{
+	float3 l = sphere.center - ray.origin;
+	float lengthSq = dot(l, l);
+	float projLOnDir = dot(l, ray.direction);
+	
+	if (projLOnDir < 0.0f)
+		return;
+	
+	float distanceToTangentSq = lengthSq - (projLOnDir * projLOnDir);
+	float radiusSq = sphere.radius * sphere.radius;
+	if (distanceToTangentSq > radiusSq)
+		return;
+	
+	// Need to check for intersection behind camera too!
+	float thc = sqrt(radiusSq - distanceToTangentSq);
+	float t1 = projLOnDir - thc;
+	float t2 = projLOnDir + thc;
+	
+	if (t1 < 0.0f)
+	{
+		t1 = t2;
+		if (t2 < 0.0f)
+		{
+			return;
+		}
+	}
+	
+	if (intersect.t > t1)
+	{			
+		float3 outPosition = ray.origin + ray.direction * t1;
+		float3 outNormal = normalize(outPosition - sphere.center);
+		outNormal = dot(ray.direction, outNormal) > 0.0f ? -outNormal : outNormal;
+
+		intersect.isHit = true;
+		intersect.t = t1;
+		intersect.position = outPosition;
+		intersect.normal = outNormal;
+		intersect.material = sphere.material;
+	}
+}
+	
+void GetPlaneIntersection(in Plane plane, in Ray ray, inout Intersect intersect)
+{
+	// p = ray * t + ray.origin - plane.center , s.t dot(p, plane.normal) = 0
+	// dot(ray * t, plane.normal) + dot(ray.origin, plane.normal) - dot(plane.center, plane.normal) = 0
+	// t * dot(ray, plane.normal) + dot(ray.origin, plane.normal) - dot(plane.center, plane.normal) = 0
+	// t = dot(plane.normal, plane.center - ray.origin) / dot(ray, plane.normal)
+	
+	float rayDirDotNormal = dot(ray.direction, plane.normal);
+	
+	// Back-face cull as well
+	if (abs(rayDirDotNormal) < 0.001f || rayDirDotNormal > 0.0f)
+	{
+		return;
+	}
+	
+	float t = dot(plane.normal, plane.center - ray.origin) / rayDirDotNormal;
+	
+	// Plane intersection is behind the camera
+	if (t <= 0)
+	{
+		return;
+	}
+	
+	// Check if plane intersection is within bounds of scaleX and scaleY
+	// For now, we will simply do a disk check because it's honestly too much work
+	// to refactor everything to work off of a transform matrix-based system...
+	// TODO: Replace this code with the transform system!
+	// For now, we just want to make sure the path-tracer works.
+	float3 pHit = ray.origin + ray.direction * t;
+	
+	if (any(plane.scaleXY))
+	{
+		float3 hitToCenter = plane.center - pHit;
+		float distToCenterSq = dot(hitToCenter, hitToCenter);
+		if (distToCenterSq > plane.scaleXY.x * plane.scaleXY.x)
+		{
+			return;
+		}
+	}
+	
+	if (intersect.t > t)
+	{
+		intersect.isHit = true;
+		intersect.t = t;
+		intersect.position = ray.origin + ray.direction * t;
+		intersect.normal = plane.normal;
+		intersect.material = plane.material;
+	}
+}
+
+// Random code
+float rng(uint2 seed)
+{
+	uint2 q = 1103515245U * ((seed >> 1U) ^ (seed.yx));
+	uint n = 1103515245U * ((q.x) ^ (q.y >> 3U));
+	return float(n) * (1.0 / float(0xffffffffU));
+}
+
+
+#endif // __COMMON_HLSLI__

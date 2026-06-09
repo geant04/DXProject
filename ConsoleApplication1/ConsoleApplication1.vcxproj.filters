@@ -76,5 +76,11 @@
     <None Include="..\shaders\psBlit.hlsl">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\shaders\Intersections.hlsl">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\shaders\Common.hlsli">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

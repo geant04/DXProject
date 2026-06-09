@@ -372,6 +372,8 @@ void MinimalDXApp::loadAssets()
 		pathTraceTask->mDispatchWidth = (mWindowProperties.mWidth + 7) / 8; // hardcoded (8, 8, 1) dims
 		pathTraceTask->mDispatchHeight = (mWindowProperties.mHeight + 7) / 8;
 
+		frameNumber = &pathTraceTask->mCameraConstants.frameNumber;
+
 		mTasks.push_back(std::move(pathTraceTask));
 	}
 
@@ -415,6 +417,9 @@ void MinimalDXApp::render()
     // Clear the render target
     FLOAT clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+	// Update frameNumber cbuffer value
+	*frameNumber += 1;
 
 	for (auto& task : mTasks)
 	{	

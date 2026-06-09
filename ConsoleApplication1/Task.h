@@ -37,6 +37,8 @@ public:
 struct CameraConstants {
 	XMFLOAT4X4 viewProjInverse;
 	XMFLOAT4 cameraPosition;
+	uint32_t frameNumber;
+	uint32_t padding0[3];
 };
 
 class ComputeTask : public Task
