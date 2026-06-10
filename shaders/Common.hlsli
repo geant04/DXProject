@@ -75,7 +75,10 @@ void GetSphereIntersection(in Sphere sphere, in Ray ray, inout Intersect interse
 	{			
 		float3 outPosition = ray.origin + ray.direction * t1;
 		float3 outNormal = normalize(outPosition - sphere.center);
-		outNormal = dot(ray.direction, outNormal) > 0.0f ? -outNormal : outNormal;
+		// If we have a backwards intersection, we can just reverse the normal.
+		// But I think this makes it harder later on, since we perform intersection test first
+		// before we perform sample Wi test. Thus, comment it out.
+		// outNormal = dot(ray.direction, outNormal) > 0.0f ? -outNormal : outNormal;
 
 		intersect.isHit = true;
 		intersect.t = t1;
@@ -135,12 +138,52 @@ void GetPlaneIntersection(in Plane plane, in Ray ray, inout Intersect intersect)
 	}
 }
 
-// Random code
-float rng(uint2 seed)
+// RNG code, replacae with state-based RNG
+float pcgHash(inout uint state)
 {
-	uint2 q = 1103515245U * ((seed >> 1U) ^ (seed.yx));
-	uint n = 1103515245U * ((q.x) ^ (q.y >> 3U));
-	return float(n) * (1.0 / float(0xffffffffU));
+	state = state * 747796405u + 2891336453u;
+	uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+	return (word >> 22u) ^ word;
+}
+
+float rng(inout uint state)
+{
+	return float(pcgHash(state)) / float(0xFFFFFFFFU);
+}
+
+uint initRNG(uint2 id, uint frame)
+{
+	// Ripped this magic from the internet.
+	uint seed = id.x ^ (id.y << 16) ^ (frame * 0x9E3779B9u);
+	return pcgHash(seed);
+}
+
+// Fresnel equations, cosThetaI should be in with wi and normal
+float FresnelDielectric(float cosThetaI, float eta)
+{
+	cosThetaI = clamp(cosThetaI, -1.0f, 1.0f);
+	
+	// Potentially flip orientations
+	if (cosThetaI < 0.0f)
+	{
+		eta = 1.0f / eta;
+		cosThetaI = -cosThetaI;
+	}
+	
+	// Compute cosThetaT
+	float sin2ThetaI = 1.0f - (cosThetaI * cosThetaI);
+	float sin2ThetaT = sin2ThetaI / (eta * eta);
+	if (sin2ThetaT >= 1.0f)
+	{
+		return 1.0f;
+	}
+	float cosThetaT = sqrt(1.0f - sin2ThetaT);
+	
+	// Bring it all together, computing parallel and perpindicular oscillation values
+	float rParl = (eta * cosThetaI - cosThetaT) / (eta * cosThetaI + cosThetaT);
+	float rPerp = (cosThetaI - eta * cosThetaT) / (cosThetaI + eta * cosThetaT);
+	
+	return 0.5f * ((rParl * rParl) + (rPerp * rPerp));
 }
 
 

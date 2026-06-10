@@ -36,7 +36,7 @@ static const Sphere glassSphere =
 	float3(-1.8f, 5.0f, -0.25f),
 	0.75f,
 	{
-		float3(1.0f, 1.0f, 1.0f),
+		float3(0.88f, 0.33f, 0.33f),
 		0.0f,
 		1.0f, // transmissive
 		false
@@ -92,11 +92,11 @@ static const Plane wallPlane3 =
 };
 static const Plane lightPlane =
 {
-	float3(0.0f, 4.0f, 8.0f),
+	float3(0.0f, 3.0f, 7.0f),
 	normalize(float3(0.0f, 1.0f, -1.0f)),
 	float2(7.0f, 7.0f),
 	{
-		float3(2.4f, 2.4f, 2.4f),
+		2.5f * float3(0.88f, 0.88f, 0.88f),
 		0.0f,
 		0.0f,
 		true
@@ -106,7 +106,7 @@ static const Plane lightPlane =
 static const float3 lightPosition = float3(0.0, 2.0, 5.0f);
 
 // Rendering details
-static const uint NUM_ITERATIONS = 10;
+static const uint NUM_ITERATIONS = 20;
 
 void GetIntersection(in Ray ray, inout Intersect intersect)
 {
@@ -124,10 +124,10 @@ void GetIntersection(in Ray ray, inout Intersect intersect)
 	GetSphereIntersection(glassSphere, ray, intersect);
 }
 
-float3 GetDiffuseWi(in float3 worldNormal, uint2 seed)
+float3 GetDiffuseWi(in float3 worldNormal, inout uint state)
 {
-	float randR = rng(seed);
-	float randG = rng(seed + uint2(1, 1));
+	float randR = rng(state);
+	float randG = rng(state);
 	
 	float2 randXY = 2.0f * float2(randR, randG) - 1.0f;
 	
@@ -140,8 +140,10 @@ float3 GetDiffuseWi(in float3 worldNormal, uint2 seed)
 }
 
 // inDir vector points "outwards", if that makes sense.
-float3 GetWi(in float3 worldInDir, in float3 worldNormal, in Material material, uint2 seed)
+float3 GetWi(in float3 worldInDir, in float3 worldNormal, in Material material, inout uint state)
 {
+	float cosThetaI = dot(worldInDir, worldNormal);
+
 	if (material.metallic > 0.0f)
 	{
 		// Reflect doesn't "reflect" in the way that the in-vector points outwards.
@@ -149,19 +151,50 @@ float3 GetWi(in float3 worldInDir, in float3 worldNormal, in Material material, 
 	}
 	if (material.transmissive > 0.0f)
 	{
-		// TODO: Need to fix the sphere intersection test to account for ray-origin inside the sphere.
+		// TODO: This material assumes for perfectly smooth surface.
+		// Thus, it will always perfectly sample as if perfectly specular.
+		// We will have to introduce a distribution function later on that provides a check for "isEffectivelySmooth".
 		float etaA = 1.0f;
-		float etaB = 1.55f;
-		float eta = dot(worldInDir, worldNormal) < 0.0f ? etaB / etaA : etaA / etaB;
-		return normalize(refract(worldInDir, worldNormal, eta));
+		float etaB = 1.49f;
+		float eta = cosThetaI < 0.0f ? etaB / etaA : etaA / etaB;
+		
+		float fresnel = FresnelDielectric(cosThetaI, etaB / etaA);
+		float probRefl = fresnel;
+		float probTrans = 1.0f - probRefl;
+		
+		if (cosThetaI < 0.0f)
+		{
+			worldNormal = -worldNormal;
+		}
+		
+		if (rng(state) < probRefl / (probRefl + probTrans))
+		{
+			return normalize(reflect(-worldInDir, worldNormal));
+		}
+		else
+		{
+			return normalize(refract(-worldInDir, worldNormal, eta));
+		}
 	}
 	
 	// Will add more complicated BSDFs later.
 	// For now, treat all materials as a diffuse material.
-	return GetDiffuseWi(worldNormal, seed);
+	return GetDiffuseWi(worldNormal, state);
 }
 
-float3 NaivePathTracer(in Ray ray, uint iterations, uint2 id)
+float3 GetReflectance(float cosThetaI, in Material material)
+{
+	if (material.transmissive > 0.0f)
+	{
+		// Debug
+		float fresnel = FresnelDielectric(cosThetaI, 1.46f);
+		return 1.0f;
+	}
+	
+	return material.color;
+}
+
+float3 NaivePathTracer(in Ray ray, uint iterations, inout uint state)
 {
 	float3 outColor = 1.0f;
 	Intersect intersect;
@@ -183,8 +216,9 @@ float3 NaivePathTracer(in Ray ray, uint iterations, uint2 id)
 		}
 		
 		float3 normal = intersect.normal;
-		float3 bsdfColor = intersect.material.color;
-		float3 sampleDirection = GetWi(-ray.direction, normal, intersect.material, id * i);
+		float cosThetaI = dot(-ray.direction, normal);
+		float3 bsdfColor = GetReflectance(cosThetaI, intersect.material); // intersect.material.color;
+		float3 sampleDirection = GetWi(-ray.direction, normal, intersect.material, state);
 		
 		float lambert = max(dot(normal, sampleDirection), 0.0f);
 		
@@ -195,7 +229,7 @@ float3 NaivePathTracer(in Ray ray, uint iterations, uint2 id)
 		
 		outColor *= bsdfColor * lambert;
 		ray.direction = sampleDirection;
-		ray.origin = intersect.position + ray.direction * 0.00001f;
+		ray.origin = intersect.position + ray.direction * 0.0001f;
 	}
 	
 	// Return nothing, since we didn't hit a light.
@@ -253,10 +287,13 @@ float3 NaiveRayTracer(in Ray ray, in float3 animatedLightPosition)
 [numthreads(8, 8, 1)]
 void CSMain( uint3 id : SV_DispatchThreadID )
 {	
-	// AA jitter hack
-	float2 jitter = float2(rng(id.xy * (frameNumber + 1)), rng(id.xy * (frameNumber + 1) * 31));
+	// RNG setup
+	uint state = initRNG(id.xy, frameNumber);
 	
-	float2 uv = (float2(id.x, id.y) + 2.0f * jitter) / float2(1280.0f, 720.0f);
+	// AA jitter hack
+	float2 jitter = float2(rng(state), rng(state));
+	
+	float2 uv = (float2(id.x, id.y) + jitter) / float2(1280.0f, 720.0f);
 	uv.y = 1.0f - uv.y;
 	
 	float2 ndc = 2.0f * uv - 1.0f;
@@ -278,7 +315,7 @@ void CSMain( uint3 id : SV_DispatchThreadID )
 	intersect.isHit = false;
 	
 	//float3 outColor = NaiveRayTracer(ray, animatedLightPosition);
-	float3 outColor = NaivePathTracer(ray, NUM_ITERATIONS, id.xy * frameNumber);
+	float3 outColor = NaivePathTracer(ray, NUM_ITERATIONS, state);
 	
 	// Lane-independent smoothing call
 	float3 accumulatedColor = outputTexture[id.xy].rgb;

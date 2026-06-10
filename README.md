@@ -7,4 +7,4 @@ Features implemented so far:
 - Naive pathtracing, able to support only diffuse and metallic materials fully so far.
 
 
-![test render](renders/babyRender2.png)
+![test render](renders/fixedGlass.png)
